@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.airshare"
+    namespace = "com.airshare.android"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.airshare"
+        applicationId = "com.airshare.android"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -29,4 +29,8 @@ android {
             isMinifyEnabled = false
         }
     }
+}
+
+dependencies {
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 }
