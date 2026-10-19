@@ -1,3 +1,4 @@
+```yaml
 name: Build Android APK
 
 on:
@@ -17,10 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
@@ -32,51 +29,21 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # The hosted Ubuntu runner already has Android SDK tools installed.
-      # Avoid setup-android's sdkmanager replacement path, which failed in the previous run.
-      - name: Android SDK anzeigen
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls -la "$ANDROID_HOME"
-          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
-          elif command -v sdkmanager >/dev/null 2>&1; then
-            sdkmanager --version
-          else
-            echo "sdkmanager was not found on the runner."
-            exit 1
-          fi
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
 
       - name: Android SDK Lizenzen akzeptieren
-        run: |
-          SDKMANAGER=""
-          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          elif command -v sdkmanager >/dev/null 2>&1; then
-            SDKMANAGER="$(command -v sdkmanager)"
-          else
-            echo "sdkmanager was not found."
-            exit 1
-          fi
-          yes | "$SDKMANAGER" --licenses || true
-
-      - name: Android SDK Pakete installieren
-        run: |
-          SDKMANAGER=""
-          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          else
-            SDKMANAGER="$(command -v sdkmanager)"
-          fi
-          "$SDKMANAGER" "platform-tools"
-          # Install the compile SDK declared by the app when it can be detected.
-          COMPILE_SDK="$(grep -Eo 'compileSdk(Version)?[[:space:]]*[= ]+[0-9]+' app/build.gradle.kts app/build.gradle 2>/dev/null | grep -Eo '[0-9]+' | tail -n1 || true)"
-          if [ -n "$COMPILE_SDK" ]; then
-            "$SDKMANAGER" "platforms;android-$COMPILE_SDK"
-          fi
+        run: yes | sdkmanager --licenses || true
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Java und Android SDK prüfen
+        run: |
+          java -version
+          sdkmanager --version
 
       - name: Android APK bauen
         run: |
@@ -88,9 +55,11 @@ jobs:
           fi
 
       - name: APK als Artefakt hochladen
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: AirShare-Android-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+```
