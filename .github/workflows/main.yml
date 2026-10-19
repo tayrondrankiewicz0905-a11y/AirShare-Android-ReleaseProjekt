@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
@@ -28,11 +32,12 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Android SDK einrichten
-        uses: android-actions/setup-android@v3
-
-      - name: Android SDK Lizenzen akzeptieren
-        run: yes | sdkmanager --licenses || true
+      - name: Android SDK überprüfen
+        run: |
+          echo "Android SDK: $ANDROID_HOME"
+          test -d "$ANDROID_HOME/platform-tools"
+          test -d "$ANDROID_HOME/platforms"
+          echo "Android SDK gefunden."
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
