@@ -1,4 +1,4 @@
-package com.airshare.android
+    package com.airshare.android
 
 import android.app.Activity
 import android.content.Intent
@@ -284,4 +284,132 @@ class MainActivity : Activity() {
 
             if (path != token && !path.startsWith("$token/")) {
                 return newFixedLengthResponse(
-                    Response.Status.NOT_FOUND
+                    Response.Status.NOT_FOUND,
+                    "text/plain",
+                    "Not found"
+                )
+            }
+
+            if (session.method == Method.POST && path == "$token/upload") {
+                val tempFiles = HashMap<String, String>()
+
+                return try {
+                    session.parseBody(tempFiles)
+
+                    val name = safeName(
+                        session.parameters["name"]?.firstOrNull()
+                            ?: "upload.bin"
+                    )
+
+                    val bodyPath = tempFiles["postData"]
+                        ?: tempFiles.values.firstOrNull()
+
+                    val bytes = bodyPath
+                        ?.let { java.io.File(it).readBytes() }
+                        ?: ByteArray(0)
+
+                    val id = UUID.randomUUID().toString().take(8)
+                    files["$id-$name"] = name to bytes
+
+                    html(
+                        "<h1>Upload erfolgreich</h1>" +
+                            "<p>${escape(name)} (${bytes.size} Bytes)</p>" +
+                            "<a href='/$token/'>Zurück</a>"
+                    )
+                } catch (_: Exception) {
+                    newFixedLengthResponse(
+                        Response.Status.BAD_REQUEST,
+                        "text/plain",
+                        "Upload fehlgeschlagen"
+                    )
+                }
+            }
+
+            if (
+                session.method == Method.GET &&
+                path.startsWith("$token/download/")
+            ) {
+                val key = path.substringAfter("$token/download/")
+                val item = files[key] ?: return newFixedLengthResponse(
+                    Response.Status.NOT_FOUND,
+                    "text/plain",
+                    "Datei nicht gefunden"
+                )
+
+                val response = newFixedLengthResponse(
+                    Response.Status.OK,
+                    mime(item.first),
+                    item.second.inputStream(),
+                    item.second.size.toLong()
+                )
+
+                response.addHeader(
+                    "Content-Disposition",
+                    "attachment; filename=\"${item.first.replace("\"", "")}\""
+                )
+
+                return response
+            }
+
+            val listing = files.entries
+                .sortedBy { it.key }
+                .joinToString("") { entry ->
+                    "<li>${escape(entry.value.first)} " +
+                        "(${entry.value.second.size} Bytes) – " +
+                        "<a href='/$token/download/${entry.key}'>" +
+                        "Herunterladen</a></li>"
+                }
+
+            val page =
+                "<h1>AirShare</h1>" +
+                "<p>Lokaler Transfer zwischen Geräten im selben WLAN.</p>" +
+                "<h2>Datei hochladen</h2>" +
+                "<form method='post' enctype='multipart/form-data' " +
+                "action='/$token/upload'>" +
+                "<input type='file' name='file' multiple required>" +
+                "<button type='submit'>Hochladen</button></form>" +
+                "<h2>Verfügbare Dateien</h2><ul>$listing</ul>" +
+                "<p>Halte die Adresse privat und stoppe AirShare nach dem Transfer.</p>"
+
+            return html(page)
+        }
+
+        private fun html(content: String): Response =
+            newFixedLengthResponse(
+                Response.Status.OK,
+                "text/html; charset=utf-8",
+                content
+            ).also {
+                it.addHeader("Cache-Control", "no-store")
+            }
+
+        private fun escape(value: String): String =
+            value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+
+        private fun mime(name: String): String =
+            when (name.substringAfterLast('.', "").lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "gif" -> "image/gif"
+                "pdf" -> "application/pdf"
+                "mp4" -> "video/mp4"
+                "txt" -> "text/plain"
+                else -> "application/octet-stream"
+            }
+    }
+
+    override fun onDestroy() {
+        if (::server.isInitialized) {
+            try {
+                server.stopServer()
+            } catch (_: Exception) {
+                // Server war bereits beendet.
+            }
+        }
+
+        super.onDestroy()
+    }
+}
