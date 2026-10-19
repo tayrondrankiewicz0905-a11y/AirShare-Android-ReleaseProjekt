@@ -1,4 +1,3 @@
-```yaml
 name: Build Android APK
 
 on:
@@ -40,11 +39,6 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Java und Android SDK prüfen
-        run: |
-          java -version
-          sdkmanager --version
-
       - name: Android APK bauen
         run: |
           if [ -f ./gradlew ]; then
@@ -62,4 +56,3 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-```
